@@ -1,0 +1,338 @@
+---
+# FROM URL: https://vadosware.io/post/yet-another-cluster-reinstall-back-to-container-linux/
+# This config is meant to be consumed by the config transpiler, which will
+# generate the corresponding Ignition config. Do not pass this config directly
+# to instances of Container Linux.
+
+# NOTE: This configuration is meant to work with Config Transpiler v0.8.0
+# The spec is available at (https://github.com/coreos/container-linux-config-transpiler/blob/v0.8.0/doc/configuration.md)
+
+passwd:
+  users:
+    - name: core
+      ssh_authorized_keys:
+	- ecdsa-sha2-nistp521 AAAAE2VjZHNhLXNoYTItbmlzdHA1MjEAAAAIbmlzdHA1MjEAAACFBAA/oRvl4sckPze1ahsmiY05k5nL7cctw5e3O6jLM1o8s2z0GpzZ8iamIEalw61UHDLBDm+Syn7tAtIasYSMShFqSQEWV5Ekgk+psQcuGFJkXYGWyfGGb5pLvRX9LwONpEgAnoSpXen66kG0t6q+1wCApnqmETnhwzBzzw0Vg0dBpnXJrg==
+        - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCyy4g+aYIwAtSqVLXT3/7KS2aCQMC6sFh1CzVm7lqrFEDDx+77bMNYvE8qOXXpCGjp5G+a6gg0UnsmvmRo2TSo8lrly/cJDtZPuQD2wmlr0/+14qq9c8HdYyVVzbvrv9UqqhcObfrjd2OkS/KajFqUFNyxRQta7WNjfPH8bs/LfWxe54GPw41gd34+Yk2yi9B+AaNs9oHv4j5UOlXPcCv0JBo2ReqKzdaP4eGLr+3O5cdUBrt+ZAsWKXtCuUOXY80pmUfhDTIYiuf99BUitLipmYDIZkSsn1huIAE9kAHPuqMS0icTPdPmzi6j2YjiPSy9YFBBprc+7rH1OjLoQ491
+        - ecdsa-sha2-nistp521 AAAAE2VjZHNhLXNoYTItbmlzdHA1MjEAAAAIbmlzdHA1MjEAAACFBACz67BUqygNOhTL+sUscS2/oogILVRUdcxT77uD13hR8XHCa7Vrb/2woDhI4Grfv35liZlJPStLn+d4X4RanNraVQA6LcHeyYEwXm8P5SV8zZB4E/VZXZfUJoNqRejgBxvOFb2DRRlxMyCU/BZFhBoLl1VZUYSTg6yS9tDh3fxu6XsMIw==
+
+systemd:
+  units:
+    # Docker will be configured initially but we'll be using containerd exclusively and will disable it after containerd setup
+    - name: docker.service
+      enabled: true
+
+    # containerd without docker as a shim, thanks to containerd.service.d/ overrides
+    - name: containerd.service
+      enabled: true
+
+    - name: sshd.socket
+      dropins:
+      - name: 10-sshd-port.conf
+        contents: |
+          [Socket]
+          ListenStream=
+          ListenStream=2222
+
+    - name: k8s-install.service
+      enabled: true
+      contents: |
+        [Install]
+        WantedBy=multi-user.target
+
+        [Unit]
+        Description=k8s installation script
+        Wants=network-online.target
+        After=network.target network-online.target
+
+        [Service]
+        Type=oneshot
+        ExecStart=/ignition/init/k8s/install.sh
+
+    - name: cni-install.service
+      enabled: true
+      contents: |
+        [Install]
+        WantedBy=multi-user.target
+
+        [Unit]
+        Description=cni plugin installation script
+        Requires=k8s-install.service
+        After=k8s-install.service
+
+        [Service]
+        Type=oneshot
+        ExecStart=/ignition/init/cni/install.sh
+
+    - name: containerd-install.service
+      enabled: true
+      contents: |
+        [Install]
+        WantedBy=multi-user.target
+
+        [Unit]
+        Description=containerd installation script
+        Requires=cni-install.service
+        After=cni-install.service
+
+        [Service]
+        Type=oneshot
+        ExecStart=/ignition/init/cri-containerd/install.sh
+
+    - name: kubeadm-install.service
+      enabled: true
+      contents: |
+        [Install]
+        WantedBy=multi-user.target
+
+        [Unit]
+        Description=kubeadm installation script
+        Requires=containerd-install.service
+        After=containerd-install.service
+
+        [Service]
+        Type=oneshot
+        Environment="PATH=/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin:/opt/bin"
+        ExecStart=/ignition/init/kubeadm/kubeadm-install.sh
+
+    - name: k8s-setup.service
+      enabled: true
+      contents: |
+        [Install]
+        WantedBy=multi-user.target
+
+        [Unit]
+        Description=kubernetes setup script
+        Requires=kubeadm-install.service
+        After=kubeadm-install.service
+
+        [Service]
+        Type=oneshot
+        User=core
+        Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/opt/bin"
+        ExecStart=/ignition/init/k8s/setup.sh
+
+storage:
+  filesystems:
+    - mount:
+        device: /dev/disk/by-label/ROOT
+        format: xfs
+        wipe_filesystem: true
+        label: ROOT
+
+  files:
+    - path: /opt/bin/kubeadm
+      filesystem: root
+      mode: 493 # 0755
+      contents:
+        remote:
+          url: https://storage.googleapis.com/kubernetes-release/release/v1.10.2/bin/linux/amd64/kubeadm
+
+    - path: /opt/bin/kubelet
+      filesystem: root
+      mode: 493 # 0755
+      contents:
+        remote:
+          url: https://storage.googleapis.com/kubernetes-release/release/v1.10.2/bin/linux/amd64/kubelet
+
+    - path: /opt/bin/kubectl
+      filesystem: root
+      mode: 511 # 0777
+      contents:
+        remote:
+          url: https://storage.googleapis.com/kubernetes-release/release/v1.10.2/bin/linux/amd64/kubectl
+
+    - path: /opt/bin/wanpoll
+      filesystem: root
+      mode: 0755
+      contents:
+        remote:
+          url: https://github.com/kawasin73/wanpoll/releases/download/v0.1.0/wanpoll-linux-amd64
+
+    - path: /etc/systemd/system/kubelet.service
+      filesystem: root
+      mode: 420 # 0644
+      contents:
+        remote:
+          url: https://raw.githubusercontent.com/kubernetes/kubernetes/v1.10.2/build/debs/kubelet.service
+
+    - path: /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
+      filesystem: root
+      mode: 420 # 0644
+      contents:
+        remote:
+          url: https://raw.githubusercontent.com/kubernetes/kubernetes/v1.10.2/build/debs/10-kubeadm.conf
+
+    - path: /ignition/init/cri-containerd/cri-containerd-1.1.0.linux-amd64.tar.gz
+      filesystem: root
+      mode: 420 # 0644
+      contents:
+        remote:
+          url: https://storage.googleapis.com/cri-containerd-release/cri-containerd-1.1.0.linux-amd64.tar.gz
+
+    - path: /ignition/init/cni/cni-plugins-v0.7.1.tgz
+      filesystem: root
+      mode: 420 # 0644
+      contents:
+        remote:
+          url: https://github.com/containernetworking/plugins/releases/download/v0.7.1/cni-plugins-amd64-v0.7.1.tgz
+
+    - path: /ignition/init/canal/rbac.yaml
+      filesystem: root
+      mode: 493 # 0755
+      contents:
+        remote:
+          url: https://docs.projectcalico.org/v3.1/getting-started/kubernetes/installation/hosted/canal/rbac.yaml
+
+    - path: /ignition/init/canal/canal.yaml
+      filesystem: root
+      mode: 493 # 0755
+      contents:
+        remote:
+          url: https://docs.projectcalico.org/v3.1/getting-started/kubernetes/installation/hosted/canal/canal.yaml
+
+    - path: /opt/wanpoll/env
+      filesystem: root
+      mode: 0600
+      contents:
+        inline: |
+          USER=xxxxxxxxxxxxx
+          PASSWORD=xxxxxxxxxxxx
+          INTERVAL=5
+          NAME=xxxxx.example.com,xxxxx.example.com
+          HZ=ZZZZZZZZZZZZ
+          AWS_ACCESS_KEY_ID=XXXXXXXXXXXXX
+          AWS_SECRET_ACCESS_KEY=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+
+    - path: /ignition/init/k8s/install.sh
+      filesystem: root
+      mode: 480 # 740
+      contents:
+        inline: |
+          #!/bin/bash
+
+          # Unzip the kubernetes binaries if not already present
+          test -d /opt/bin/kubeadm && echo "k8s binaries (kubeadm) already installed" && exit 0
+
+          # NOTE: If RELEASE is updated, the SHA512 SUMs will need to be as well
+          echo -e "=> Installing k8s v1.10.2"
+
+          echo "=> Cusomizing kubelet.service..."
+          sed -i "s:/usr/bin:/opt/bin:g" /etc/systemd/system/kubelet.service
+          sed -i "s:/usr/bin:/opt/bin:g" /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
+
+          systemctl daemon-reload
+          systemctl enable kubelet
+          systemctl start kubelet
+
+    - filesystem: root
+      path: /ignition/init/cri-containerd/install.sh
+      mode: 480 # 740
+      contents:
+        inline: |
+          #!/bin/bash
+
+          # Unzip the kubernetes binaries if not already present
+          test -d /opt/containerd && echo "containerd binaries already installed" && exit 0
+
+          VERSION=1.1.0
+          echo -e "=> Installing containerd v${VERSION}"
+
+          echo "=> Installing containerd...."
+          cd /ignition/init/cri-containerd
+          tar -C / -k -xzf cri-containerd-${VERSION}.linux-amd64.tar.gz
+
+          echo "=> Copying /usr/local binaries to /opt/bin ...."
+          mkdir -p /ignition/init/cri-containerd/unzipped
+          tar -C unzipped -k -xzf cri-containerd-${VERSION}.linux-amd64.tar.gz
+          cp -r unzipped/usr/local/bin/* /opt/bin
+          systemctl start containerd
+
+          echo "=> Adding dropins...."
+          cat > /etc/systemd/system/kubelet.service.d/0-containerd.conf <<EOF
+          [Service]
+          Environment="KUBELET_EXTRA_ARGS=--container-runtime=remote --runtime-request-timeout=15m --container-runtime-endpoint=unix:///run/containerd/containerd.sock --volume-plugin-dir=/var/lib/kubelet/volumeplugins"
+          EOF
+
+          mkdir -p /etc/systemd/system/containerd.service.d/
+          cat > /etc/systemd/system/containerd.service.d/0-direct-containerd.conf <<EOF
+          [Service]
+          ExecStart=
+          ExecStart=/opt/bin/containerd
+          EOF
+
+          echo "=> Triggering systemctl daemon-reload...."
+          systemctl daemon-reload
+          systemctl restart containerd
+
+    - filesystem: root
+      path: /ignition/init/cni/install.sh
+      mode: 480 # 740
+      contents:
+        inline: |
+          #!/bin/bash
+
+          # Unzip the kubernetes binaries if not already present
+          test -d /opt/cni/bin && echo "CNI binaries already installed" && exit 0
+
+          VERSION=0.7.1
+          echo -e "=> Installing CNI (v${VERSION}) binaries to /opt/cni/bin"
+          cd /ignition/init/cni
+          mkdir -p /opt/cni/bin
+          tar -C /opt/cni/bin -k -xzf cni-plugins-v${VERSION}.tgz
+
+    - filesystem: root
+      path: /ignition/init/kubeadm/kubeadm-install.sh
+      mode: 480 # 740
+      contents:
+        inline: |
+          #!/bin/bash
+
+          # Ensure kubeadm binary is present
+          test -f /opt/bin/kubeadm || (echo "Failed to find kubeadm binary" && exit 1)
+
+          # Exit if kubeadm has already been run (/etc/kubernetes folder would have been created)
+          test -d /etc/kubernetes && echo "/etc/kubernetes is present, kubeadm should have already been run once" && exit 0
+
+          echo "=> Running kubeadm init..."
+          /opt/bin/kubeadm init --cri-socket "/run/containerd/containerd.sock" --pod-network-cidr "10.244.0.0/16"
+
+          # Disable docker (kubelet will use containerd runtime directly)
+          sudo systemctl stop docker
+          sudo systemctl disable docker
+
+          echo "=> Running kubeadm post-install set up for user 'core'"
+          mkdir -p /home/core/.kube
+          cp -i /etc/kubernetes/admin.conf /home/core/.kube/config
+          chown $(id -u core):$(id -g core) /home/core/.kube/config
+
+    - filesystem: root
+      path: /ignition/init/k8s/setup.sh
+      mode: 493 # 0755
+      contents:
+        inline: |
+          #!/bin/bash
+
+          # Ensure /etc/kubernetes is present (created by kubeadm)
+          test -d /etc/kubernetes || (echo "/etc/kubernetes not present, ensure kubeadm has run properly" && exit 1)
+
+          echo "=> Enabling workload running on the master node"
+          kubectl taint nodes --all node-role.kubernetes.io/master-
+
+          echo "=> Installing canal"
+          kubectl apply -f /ignition/init/canal/rbac.yaml
+          kubectl apply -f /ignition/init/canal/canal.yaml
+
+    - path: /etc/ssh/sshd_config
+      filesystem: root
+      mode: 0600
+      contents:
+        inline: |
+          # Use most defaults for sshd configuration.
+          UsePrivilegeSeparation sandbox
+          Subsystem sftp internal-sftp
+          UseDNS no
+
+          PasswordAuthentication no
+          PermitRootLogin no
+          AllowUsers core
+          AuthenticationMethods publickey
