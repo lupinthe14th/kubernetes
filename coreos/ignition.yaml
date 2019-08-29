@@ -11,8 +11,7 @@ passwd:
   users:
     - name: core
       ssh_authorized_keys:
-	- ecdsa-sha2-nistp521 AAAAE2VjZHNhLXNoYTItbmlzdHA1MjEAAAAIbmlzdHA1MjEAAACFBAA/oRvl4sckPze1ahsmiY05k5nL7cctw5e3O6jLM1o8s2z0GpzZ8iamIEalw61UHDLBDm+Syn7tAtIasYSMShFqSQEWV5Ekgk+psQcuGFJkXYGWyfGGb5pLvRX9LwONpEgAnoSpXen66kG0t6q+1wCApnqmETnhwzBzzw0Vg0dBpnXJrg==
-        - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCyy4g+aYIwAtSqVLXT3/7KS2aCQMC6sFh1CzVm7lqrFEDDx+77bMNYvE8qOXXpCGjp5G+a6gg0UnsmvmRo2TSo8lrly/cJDtZPuQD2wmlr0/+14qq9c8HdYyVVzbvrv9UqqhcObfrjd2OkS/KajFqUFNyxRQta7WNjfPH8bs/LfWxe54GPw41gd34+Yk2yi9B+AaNs9oHv4j5UOlXPcCv0JBo2ReqKzdaP4eGLr+3O5cdUBrt+ZAsWKXtCuUOXY80pmUfhDTIYiuf99BUitLipmYDIZkSsn1huIAE9kAHPuqMS0icTPdPmzi6j2YjiPSy9YFBBprc+7rH1OjLoQ491
+        - ecdsa-sha2-nistp521 AAAAE2VjZHNhLXNoYTItbmlzdHA1MjEAAAAIbmlzdHA1MjEAAACFBAA/oRvl4sckPze1ahsmiY05k5nL7cctw5e3O6jLM1o8s2z0GpzZ8iamIEalw61UHDLBDm+Syn7tAtIasYSMShFqSQEWV5Ekgk+psQcuGFJkXYGWyfGGb5pLvRX9LwONpEgAnoSpXen66kG0t6q+1wCApnqmETnhwzBzzw0Vg0dBpnXJrg==
         - ecdsa-sha2-nistp521 AAAAE2VjZHNhLXNoYTItbmlzdHA1MjEAAAAIbmlzdHA1MjEAAACFBACz67BUqygNOhTL+sUscS2/oogILVRUdcxT77uD13hR8XHCa7Vrb/2woDhI4Grfv35liZlJPStLn+d4X4RanNraVQA6LcHeyYEwXm8P5SV8zZB4E/VZXZfUJoNqRejgBxvOFb2DRRlxMyCU/BZFhBoLl1VZUYSTg6yS9tDh3fxu6XsMIw==
 
 systemd:
@@ -24,14 +23,6 @@ systemd:
     # containerd without docker as a shim, thanks to containerd.service.d/ overrides
     - name: containerd.service
       enabled: true
-
-    - name: sshd.socket
-      dropins:
-      - name: 10-sshd-port.conf
-        contents: |
-          [Socket]
-          ListenStream=
-          ListenStream=2222
 
     - name: k8s-install.service
       enabled: true
@@ -122,90 +113,84 @@ storage:
   files:
     - path: /opt/bin/kubeadm
       filesystem: root
-      mode: 493 # 0755
+      # 0755
+      mode: 493
       contents:
         remote:
-          url: https://storage.googleapis.com/kubernetes-release/release/v1.10.2/bin/linux/amd64/kubeadm
+          url: https://storage.googleapis.com/kubernetes-release/release/v1.15.3/bin/linux/arm64/kubeadm
+          verification:
+            hash:
+              function: sha512
+              sum: f4c393e0cce39beca4f44e06fd6ebf4a41b708ba5fc01faa2109fbd93c2c56a4545415be30e9a9757269887ae52c579a4d49b35ae6bc86d167e1bccb165682e1
 
     - path: /opt/bin/kubelet
       filesystem: root
-      mode: 493 # 0755
+      # 0755
+      mode: 493
       contents:
         remote:
-          url: https://storage.googleapis.com/kubernetes-release/release/v1.10.2/bin/linux/amd64/kubelet
+          url: https://storage.googleapis.com/kubernetes-release/release/v1.15.3/bin/linux/arm64/kubelet
+          verification:
+            hash:
+              function: sha512
+              sum: c9304813054b1925ff6db653abd46e01d79e70c377ab874f9c3e0cab4476826ea58f549cfb164535df11b958522677b8b645faa9bc17710c94feb57f02019593
 
     - path: /opt/bin/kubectl
       filesystem: root
-      mode: 511 # 0777
+      # 0777
+      mode: 511
       contents:
         remote:
-          url: https://storage.googleapis.com/kubernetes-release/release/v1.10.2/bin/linux/amd64/kubectl
-
-    - path: /opt/bin/wanpoll
-      filesystem: root
-      mode: 0755
-      contents:
-        remote:
-          url: https://github.com/kawasin73/wanpoll/releases/download/v0.1.0/wanpoll-linux-amd64
+          url: https://storage.googleapis.com/kubernetes-release/release/v1.15.3/bin/linux/arm64/kubectl
+          verification:
+            hash:
+              function: sha512
+              sum: 45f0825b88ef21ff94a9f04b767ee3c2cb8792f8164525f18603f7ab304903fd151501b4b646578dc5088df31a10ee9d41959402351dfeb2f8652afeccee5516
 
     - path: /etc/systemd/system/kubelet.service
       filesystem: root
-      mode: 420 # 0644
+      # 0644
+      mode: 420
       contents:
         remote:
-          url: https://raw.githubusercontent.com/kubernetes/kubernetes/v1.10.2/build/debs/kubelet.service
+          url: https://raw.githubusercontent.com/kubernetes/kubernetes/v1.15.3/build/debs/kubelet.service
 
     - path: /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
+      # 0644
       filesystem: root
-      mode: 420 # 0644
+      mode: 420
       contents:
         remote:
-          url: https://raw.githubusercontent.com/kubernetes/kubernetes/v1.10.2/build/debs/10-kubeadm.conf
+          url: https://raw.githubusercontent.com/kubernetes/kubernetes/v1.15.3/build/debs/10-kubeadm.conf
 
-    - path: /ignition/init/cri-containerd/cri-containerd-1.1.0.linux-amd64.tar.gz
+    - path: /ignition/init/cri-containerd/cri-containerd-1.1.0.linux-arm64.tar.gz
       filesystem: root
-      mode: 420 # 0644
+      # 0644
+      mode: 420
       contents:
         remote:
-          url: https://storage.googleapis.com/cri-containerd-release/cri-containerd-1.1.0.linux-amd64.tar.gz
+          url: https://storage.googleapis.com/cri-containerd-release/cri-containerd-1.1.0.linux-arm64.tar.gz
 
     - path: /ignition/init/cni/cni-plugins-v0.7.1.tgz
       filesystem: root
-      mode: 420 # 0644
+      # 0644
+      mode: 420
       contents:
         remote:
-          url: https://github.com/containernetworking/plugins/releases/download/v0.7.1/cni-plugins-amd64-v0.7.1.tgz
-
-    - path: /ignition/init/canal/rbac.yaml
-      filesystem: root
-      mode: 493 # 0755
-      contents:
-        remote:
-          url: https://docs.projectcalico.org/v3.1/getting-started/kubernetes/installation/hosted/canal/rbac.yaml
+          url: https://github.com/containernetworking/plugins/releases/download/v0.7.1/cni-plugins-arm64-v0.7.1.tgz
 
     - path: /ignition/init/canal/canal.yaml
       filesystem: root
-      mode: 493 # 0755
+      # 0755
+      mode: 493
       contents:
         remote:
-          url: https://docs.projectcalico.org/v3.1/getting-started/kubernetes/installation/hosted/canal/canal.yaml
-
-    - path: /opt/wanpoll/env
-      filesystem: root
-      mode: 0600
-      contents:
-        inline: |
-          USER=xxxxxxxxxxxxx
-          PASSWORD=xxxxxxxxxxxx
-          INTERVAL=5
-          NAME=xxxxx.example.com,xxxxx.example.com
-          HZ=ZZZZZZZZZZZZ
-          AWS_ACCESS_KEY_ID=XXXXXXXXXXXXX
-          AWS_SECRET_ACCESS_KEY=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+          url: https://docs.projectcalico.org/v3.8/manifests/canal.yaml
 
     - path: /ignition/init/k8s/install.sh
       filesystem: root
-      mode: 480 # 740
+      # 740
+      mode: 480
       contents:
         inline: |
           #!/bin/bash
@@ -214,7 +199,7 @@ storage:
           test -d /opt/bin/kubeadm && echo "k8s binaries (kubeadm) already installed" && exit 0
 
           # NOTE: If RELEASE is updated, the SHA512 SUMs will need to be as well
-          echo -e "=> Installing k8s v1.10.2"
+          echo -e "=> Installing k8s v1.15.3"
 
           echo "=> Cusomizing kubelet.service..."
           sed -i "s:/usr/bin:/opt/bin:g" /etc/systemd/system/kubelet.service
@@ -226,7 +211,8 @@ storage:
 
     - filesystem: root
       path: /ignition/init/cri-containerd/install.sh
-      mode: 480 # 740
+      # 740
+      mode: 480
       contents:
         inline: |
           #!/bin/bash
@@ -239,11 +225,11 @@ storage:
 
           echo "=> Installing containerd...."
           cd /ignition/init/cri-containerd
-          tar -C / -k -xzf cri-containerd-${VERSION}.linux-amd64.tar.gz
+          tar -C / -k -xzf cri-containerd-${VERSION}.linux-arm64.tar.gz
 
           echo "=> Copying /usr/local binaries to /opt/bin ...."
           mkdir -p /ignition/init/cri-containerd/unzipped
-          tar -C unzipped -k -xzf cri-containerd-${VERSION}.linux-amd64.tar.gz
+          tar -C unzipped -k -xzf cri-containerd-${VERSION}.linux-arm64.tar.gz
           cp -r unzipped/usr/local/bin/* /opt/bin
           systemctl start containerd
 
@@ -266,7 +252,8 @@ storage:
 
     - filesystem: root
       path: /ignition/init/cni/install.sh
-      mode: 480 # 740
+      # 740
+      mode: 480
       contents:
         inline: |
           #!/bin/bash
@@ -282,7 +269,8 @@ storage:
 
     - filesystem: root
       path: /ignition/init/kubeadm/kubeadm-install.sh
-      mode: 480 # 740
+      # 740
+      mode: 480
       contents:
         inline: |
           #!/bin/bash
@@ -307,7 +295,8 @@ storage:
 
     - filesystem: root
       path: /ignition/init/k8s/setup.sh
-      mode: 493 # 0755
+      # 0755
+      mode: 493
       contents:
         inline: |
           #!/bin/bash
@@ -318,8 +307,19 @@ storage:
           echo "=> Enabling workload running on the master node"
           kubectl taint nodes --all node-role.kubernetes.io/master-
 
-          echo "=> Installing canal"
-          kubectl apply -f /ignition/init/canal/rbac.yaml
+          echo "=> Installing Kubernetes API datastore with flannel networking"
+          kubectl apply -f https://docs.projectcalico.org/v3.8/manifests/rbac/rbac-kdd-flannel.yaml
+
+          # NOTE: If you are using pod CIDR 10.244.0.0/16, skip to the next
+          #       step. If you are using a different pod CIDR, use the following
+          #       commands to set an environment variable called POD_CIDR
+          #       containing your pod CIDR and replace 10.244.0.0/16 in the
+          #       manifest with your pod CIDR.
+          #echo "=> Cusomizing kubelet.service..."
+          #POD_CIDR="10.244.0.0/16" \
+          #sed -i -e "s?10.244.0.0/16?$POD_CIDR?g" \
+          #          /ignition/init/canal/canal.yaml
+          echo "=> Installing with the Kubernetes API datastore"
           kubectl apply -f /ignition/init/canal/canal.yaml
 
     - path: /etc/ssh/sshd_config
