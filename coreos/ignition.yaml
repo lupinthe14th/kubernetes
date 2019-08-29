@@ -16,12 +16,7 @@ passwd:
 
 systemd:
   units:
-    # Docker will be configured initially but we'll be using containerd exclusively and will disable it after containerd setup
     - name: docker.service
-      enabled: true
-
-    # containerd without docker as a shim, thanks to containerd.service.d/ overrides
-    - name: containerd.service
       enabled: true
 
     - name: k8s-install.service
@@ -39,36 +34,6 @@ systemd:
         Type=oneshot
         ExecStart=/ignition/init/k8s/install.sh
 
-    - name: cni-install.service
-      enabled: true
-      contents: |
-        [Install]
-        WantedBy=multi-user.target
-
-        [Unit]
-        Description=cni plugin installation script
-        Requires=k8s-install.service
-        After=k8s-install.service
-
-        [Service]
-        Type=oneshot
-        ExecStart=/ignition/init/cni/install.sh
-
-    - name: containerd-install.service
-      enabled: true
-      contents: |
-        [Install]
-        WantedBy=multi-user.target
-
-        [Unit]
-        Description=containerd installation script
-        Requires=cni-install.service
-        After=cni-install.service
-
-        [Service]
-        Type=oneshot
-        ExecStart=/ignition/init/cri-containerd/install.sh
-
     - name: kubeadm-install.service
       enabled: true
       contents: |
@@ -77,8 +42,6 @@ systemd:
 
         [Unit]
         Description=kubeadm installation script
-        Requires=containerd-install.service
-        After=containerd-install.service
 
         [Service]
         Type=oneshot
@@ -163,22 +126,6 @@ storage:
         remote:
           url: https://raw.githubusercontent.com/kubernetes/kubernetes/v1.15.3/build/debs/10-kubeadm.conf
 
-    - path: /ignition/init/cri-containerd/cri-containerd-1.1.0.linux-arm64.tar.gz
-      filesystem: root
-      # 0644
-      mode: 420
-      contents:
-        remote:
-          url: https://storage.googleapis.com/cri-containerd-release/cri-containerd-1.1.0.linux-arm64.tar.gz
-
-    - path: /ignition/init/cni/cni-plugins-v0.7.1.tgz
-      filesystem: root
-      # 0644
-      mode: 420
-      contents:
-        remote:
-          url: https://github.com/containernetworking/plugins/releases/download/v0.7.1/cni-plugins-arm64-v0.7.1.tgz
-
     - path: /ignition/init/canal/canal.yaml
       filesystem: root
       # 0755
@@ -210,64 +157,6 @@ storage:
           systemctl start kubelet
 
     - filesystem: root
-      path: /ignition/init/cri-containerd/install.sh
-      # 740
-      mode: 480
-      contents:
-        inline: |
-          #!/bin/bash
-
-          # Unzip the kubernetes binaries if not already present
-          test -d /opt/containerd && echo "containerd binaries already installed" && exit 0
-
-          VERSION=1.1.0
-          echo -e "=> Installing containerd v${VERSION}"
-
-          echo "=> Installing containerd...."
-          cd /ignition/init/cri-containerd
-          tar -C / -k -xzf cri-containerd-${VERSION}.linux-arm64.tar.gz
-
-          echo "=> Copying /usr/local binaries to /opt/bin ...."
-          mkdir -p /ignition/init/cri-containerd/unzipped
-          tar -C unzipped -k -xzf cri-containerd-${VERSION}.linux-arm64.tar.gz
-          cp -r unzipped/usr/local/bin/* /opt/bin
-          systemctl start containerd
-
-          echo "=> Adding dropins...."
-          cat > /etc/systemd/system/kubelet.service.d/0-containerd.conf <<EOF
-          [Service]
-          Environment="KUBELET_EXTRA_ARGS=--container-runtime=remote --runtime-request-timeout=15m --container-runtime-endpoint=unix:///run/containerd/containerd.sock --volume-plugin-dir=/var/lib/kubelet/volumeplugins"
-          EOF
-
-          mkdir -p /etc/systemd/system/containerd.service.d/
-          cat > /etc/systemd/system/containerd.service.d/0-direct-containerd.conf <<EOF
-          [Service]
-          ExecStart=
-          ExecStart=/opt/bin/containerd
-          EOF
-
-          echo "=> Triggering systemctl daemon-reload...."
-          systemctl daemon-reload
-          systemctl restart containerd
-
-    - filesystem: root
-      path: /ignition/init/cni/install.sh
-      # 740
-      mode: 480
-      contents:
-        inline: |
-          #!/bin/bash
-
-          # Unzip the kubernetes binaries if not already present
-          test -d /opt/cni/bin && echo "CNI binaries already installed" && exit 0
-
-          VERSION=0.7.1
-          echo -e "=> Installing CNI (v${VERSION}) binaries to /opt/cni/bin"
-          cd /ignition/init/cni
-          mkdir -p /opt/cni/bin
-          tar -C /opt/cni/bin -k -xzf cni-plugins-v${VERSION}.tgz
-
-    - filesystem: root
       path: /ignition/init/kubeadm/kubeadm-install.sh
       # 740
       mode: 480
@@ -282,11 +171,7 @@ storage:
           test -d /etc/kubernetes && echo "/etc/kubernetes is present, kubeadm should have already been run once" && exit 0
 
           echo "=> Running kubeadm init..."
-          /opt/bin/kubeadm init --cri-socket "/run/containerd/containerd.sock" --pod-network-cidr "10.244.0.0/16"
-
-          # Disable docker (kubelet will use containerd runtime directly)
-          sudo systemctl stop docker
-          sudo systemctl disable docker
+          /opt/bin/kubeadm init --cri-socket "/var/run/docker.sock" --pod-network-cidr "10.244.0.0/16"
 
           echo "=> Running kubeadm post-install set up for user 'core'"
           mkdir -p /home/core/.kube
