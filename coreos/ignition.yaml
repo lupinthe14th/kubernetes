@@ -4,8 +4,8 @@
 # generate the corresponding Ignition config. Do not pass this config directly
 # to instances of Container Linux.
 
-# NOTE: This configuration is meant to work with Config Transpiler v0.8.0
-# The spec is available at (https://github.com/coreos/container-linux-config-transpiler/blob/v0.8.0/doc/configuration.md)
+# NOTE: This configuration is meant to work with Config Transpiler v0.9.0
+# The spec is available at (https://github.com/coreos/container-linux-config-transpiler/blob/v0.9.0/doc/configuration.md)
 
 passwd:
   users:
