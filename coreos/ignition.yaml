@@ -12,7 +12,6 @@ passwd:
     - name: core
       ssh_authorized_keys:
         - ecdsa-sha2-nistp521 AAAAE2VjZHNhLXNoYTItbmlzdHA1MjEAAAAIbmlzdHA1MjEAAACFBAA/oRvl4sckPze1ahsmiY05k5nL7cctw5e3O6jLM1o8s2z0GpzZ8iamIEalw61UHDLBDm+Syn7tAtIasYSMShFqSQEWV5Ekgk+psQcuGFJkXYGWyfGGb5pLvRX9LwONpEgAnoSpXen66kG0t6q+1wCApnqmETnhwzBzzw0Vg0dBpnXJrg==
-        - ecdsa-sha2-nistp521 AAAAE2VjZHNhLXNoYTItbmlzdHA1MjEAAAAIbmlzdHA1MjEAAACFBACz67BUqygNOhTL+sUscS2/oogILVRUdcxT77uD13hR8XHCa7Vrb/2woDhI4Grfv35liZlJPStLn+d4X4RanNraVQA6LcHeyYEwXm8P5SV8zZB4E/VZXZfUJoNqRejgBxvOFb2DRRlxMyCU/BZFhBoLl1VZUYSTg6yS9tDh3fxu6XsMIw==
 
 systemd:
   units:
