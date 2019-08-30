@@ -227,3 +227,13 @@ storage:
       contents:
         inline: |
           corepi3001
+
+networkd:
+  units:
+    - name: 10-dhcp.network
+      contents: |
+        [Match]
+        Name=en*
+
+        [Network]
+        DHCP=yes
